@@ -1,18 +1,140 @@
 ---
-title: "R Notebook"
+title: "Final Project"
+author: ""
 output: html_notebook
 ---
-
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
-
-Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
-
+### Set up
 ```{r}
-plot(cars)
+# load necessary packages
+library(tidyverse)
+library(mosaic)
+library(dcData)
+library(readr)
+library(maps)
+library(dplyr)
+library(tidyverse)
+library(mdsr)
+library(mvtnorm)
+library(factoextra)
 ```
 
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+### Introduction
+__There are hundreds of national universities that rank high globally. In this project, we intend to explore data related to the ranking of American universities. Through the data analysis of the top universities in the United States, our objectives are to to identify what conditions the university is most likely to be ranked high and build a model for future predictions. Also, we would like to perform clustering analysis to find the similar universities for references.__
 
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+### Data sources and data intake
+```{r}
+# This contains rank and internal factors that affect rank.
+dfRank <- read.csv("cwurData.csv") %>% filter(year == 2015, country == "USA")
+#dfCountry <- read.csv("school_and_country_table.csv")
+# This is about geographic and other information for each university
+dfInfo <- read.csv("world-universities.csv")
+# This is demographic data by county
+dfDemo <- read.csv("acs2017_county_data.csv")
+```
+__These data were published by The Center for World University Rankings (CWUR) in 2019. And CWUR performed quantitative research to assess the quality of education, alumni employment, quality of faculty, and research performance without relying on surveys and university data submissions. Reader can download the data from the following link:__
+<https://www.kaggle.com/mylesoneill/world-university-rankings/download>
 
-The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+```{r}
+MainStates <- map_data("state")
+```
+This data is from __maps__ library which provide basic geographical data of main states in the US.
+
+### Data cleaning and wrangling
+```{r}
+dfCountry <-dfCountry %>% mutate(country = gsub(pattern = "United States of America", replacement = "USA", country))
+
+dfDemo <-dfDemo %>% mutate(County = gsub(pattern = " County", replacement = "", County))
+```
+
+```{r}
+dfInfo$NAME <- tolower(dfInfo$NAME)
+dfInfo$COUNTY <- tolower(dfInfo$COUNTY)
+dfCountry$school_name <- tolower(dfCountry$school_name)
+dfRank$institution <- tolower(dfRank$institution)
+dfDemo$County <- tolower(dfDemo$County)
+dfDemo$State <- state.abb[dfDemo$State]
+```
+Also, we notice that the texts format is different in upper and lower cases. And we unify all the text to lower cases.
+
+```{r}
+# dataset for predicting
+dfML1 <- dfRank %>% select(-c("institution", "country", "year"))
+# binning for top200 and others
+rankData <- dfML1$world_rank
+for(x in 1:length(rankData)){
+  if (rankData[x] <=200){
+    dfML1$world_rank[x] <- "Top200"
+  } else{
+    dfML1$world_rank[x] <- "NotTop200"
+  }
+}
+dfML1$world_rank <-as.factor(dfML1$world_rank)
+
+
+```
+We bin the world rank into different groups for our future exploration.
+
+```{r}
+# dataset for clustering
+# add county information
+dfRankCounty <- dfRank %>% inner_join(dfInfo %>% select(NAME, COUNTY, STATE), by = c("institution" = "NAME"))
+# add demographic information
+dfML2 <- dfRankCounty %>% inner_join(dfDemo %>% select(everything()), by = c("COUNTY" = "County", "STATE" = "State")) %>% select(-c("institution", "country", "COUNTY", "STATE", "year", "CountyId"))
+```
+
+### Classification Predicting
+```{r}
+glm_fits <- glm(world_rank ~ quality_of_education + alumni_employment + quality_of_faculty + patents + influence + broad_impact, data = dfML1, family = binomial)
+summary(glm_fits)
+```
+```{r}
+glm_probs <- predict(glm_fits, type = "response")
+glm_probs %>% head()
+```
+```{r}
+contrasts(dfML1$world_rank)
+```
+```{r}
+glm_pred <- rep("NotTop200", 139)
+glm_pred[glm_probs > .5] = "Top200"
+glm_pred[1:100]
+```
+```{r}
+table(glm_pred, dfML1$world_rank)
+```
+```{r}
+mean(glm_pred == dfML1$world_rank)
+```
+
+```{r}
+library(caret)
+
+# define training control
+train_control <- trainControl(method = "cv", number = 10)
+
+# train the model on training set
+model <- train(world_rank ~ quality_of_education + alumni_employment + quality_of_faculty + patents + influence + broad_impact,
+               data = dfML1,
+               trControl = train_control,
+               method = "glm",
+               family=binomial())
+
+# print cv scores
+print(model)
+```
+
+### Clustering analysis
+Rank is not the only factors for future student to choose universities. We would like to consider other factors such as demographic data of the county in which the universities locate.
+
+
+
+
+
+
+
+
+
+
+
+
+
