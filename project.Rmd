@@ -19,31 +19,39 @@ library(factoextra)
 ```
 
 ### Introduction
-__There are hundreds of national universities that rank high globally. In this project, we intend to explore data related to the ranking of American universities. Through the data analysis of the top universities in the United States, our objectives are to to identify what conditions the university is most likely to be ranked high and build a model for future predictions. Also, we would like to perform clustering analysis to find the similar universities for references.__
+
+There are hundreds of national universities that rank high globally. In this project, we intend to explore data related to the ranking of American universities. Through the data analysis of the top universities in the United States, our objectives are to to identify what conditions the university is most likely to be ranked high and build a model for future predictions. Also, we would like to perform clustering analysis to find the similar universities for references.
 
 ### Data sources and data intake
+
+For dfRank, we select ranks of the university in 2015.
+
 ```{r}
 # This contains rank and internal factors that affect rank.
 dfRank <- read.csv("cwurData.csv") %>% filter(year == 2015, country == "USA")
-#dfCountry <- read.csv("school_and_country_table.csv")
+dfCountry <- read.csv("school_and_country_table.csv")
 # This is about geographic and other information for each university
 dfInfo <- read.csv("world-universities.csv")
 # This is demographic data by county
 dfDemo <- read.csv("acs2017_county_data.csv")
 ```
-__These data were published by The Center for World University Rankings (CWUR) in 2019. And CWUR performed quantitative research to assess the quality of education, alumni employment, quality of faculty, and research performance without relying on surveys and university data submissions. Reader can download the data from the following link:__
+These data was published by The Center for World University Rankings (CWUR) in 2019. And CWUR performed quantitative research to assess the quality of education, alumni employment, quality of faculty, and research performance without relying on surveys and university data submissions. Reader can download the data from the following link:
 <https://www.kaggle.com/mylesoneill/world-university-rankings/download>
 
 ```{r}
-MainStates <- map_data("state")
+MainStates <- map_data
+head(MainStates)
 ```
 This data is from __maps__ library which provide basic geographical data of main states in the US.
 
 ### Data cleaning and wrangling
 ```{r}
-dfCountry <-dfCountry %>% mutate(country = gsub(pattern = "United States of America", replacement = "USA", country))
+dfCountry <- dfCountry %>% mutate(country = gsub(pattern = "United States of America", replacement = "USA", country))
 
-dfDemo <-dfDemo %>% mutate(County = gsub(pattern = " County", replacement = "", County))
+dfDemo <- dfDemo %>% mutate(County = gsub(pattern = " County", replacement = "", County))
+
+head(dfCountry)
+head(dfDemo)
 ```
 
 ```{r}
@@ -57,20 +65,20 @@ dfDemo$State <- state.abb[dfDemo$State]
 Also, we notice that the texts format is different in upper and lower cases. And we unify all the text to lower cases.
 
 ```{r}
-# dataset for predicting
+# data set for predicting
 dfML1 <- dfRank %>% select(-c("institution", "country", "year"))
 # binning for top200 and others
 rankData <- dfML1$world_rank
 for(x in 1:length(rankData)){
-  if (rankData[x] <=200){
+  if (rankData[x] <= 200){
     dfML1$world_rank[x] <- "Top200"
   } else{
     dfML1$world_rank[x] <- "NotTop200"
   }
 }
-dfML1$world_rank <-as.factor(dfML1$world_rank)
+dfML1$world_rank <- as.factor(dfML1$world_rank)
 
-
+head(dfML1)
 ```
 We bin the world rank into different groups for our future exploration.
 

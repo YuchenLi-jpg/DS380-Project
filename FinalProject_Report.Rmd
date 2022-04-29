@@ -19,12 +19,13 @@ library(dplyr)
 # load packages for Rstudio Cloud
 library(tidyverse)
 library(mosaic)
-install.packages("devtools")
-devtools::install_github("mdbeckman/dcData")
+# install.packages("devtools")
+# devtools::install_github("mdbeckman/dcData")
 library(readr)
 library(dplyr)
 ```
 ### Introduction
+
 __In this project, we want to explore data related to the ranking of American universities. The problems we hope to solve is which factors are more relevant to the overall ranking of American universities, such as geographical locations or school hardware foundations. Through the data analysis of the top 300 universities in the United States, we hope to be able to identify what conditions the university is most likely to be ranked high.__
 
 ### Data sources and data intake
