@@ -94,6 +94,10 @@ dfML2$world_rank <-as.factor(dfML2$world_rank)
 ```
 
 ```{r}
+glm_fits <- glm(world_rank ~ quality_of_education + alumni_employment + quality_of_faculty + patents + influence + broad_impact, data = dfML1, family = binomial)
+summary(glm_fits)
+```
+```{r}
 glm_probs <- predict(glm_fits, type = "response")
 glm_probs %>% head()
 ```
@@ -103,7 +107,7 @@ contrasts(dfML1$world_rank)
 ```{r}
 glm_pred <- rep("NotTop200", 227)
 glm_pred[glm_probs > .5] = "Top200"
-glm_pred[1:100]
+glm_pred
 ```
 ```{r}
 table(glm_pred, dfML1$world_rank)
