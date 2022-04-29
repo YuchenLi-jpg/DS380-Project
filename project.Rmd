@@ -16,6 +16,7 @@ library(mdsr)
 library(mvtnorm)
 library(factoextra)
 library(ggplot2)
+library(usdata)
 ```
 
 ### Introduction
@@ -40,7 +41,6 @@ These data was published by The Center for World University Rankings (CWUR) in 2
 
 ```{r}
 MainStates <- map_data
-head(MainStates)
 ```
 This data is from __maps__ library which provide basic geographical data of main states in the US.
 
@@ -60,7 +60,6 @@ dfInfo$COUNTY <- tolower(dfInfo$COUNTY)
 dfCountry$school_name <- tolower(dfCountry$school_name)
 dfRank$institution <- tolower(dfRank$institution)
 dfDemo$County <- tolower(dfDemo$County)
-dfDemo$State <- state.abb[dfDemo$State]
 ```
 Also, we notice that the texts format is different in upper and lower cases. And we unify all the text to lower cases.
 
@@ -86,8 +85,9 @@ We bin the world rank into different groups for our future exploration.
 # dataset for clustering
 # add county information
 dfRankCounty <- dfRank %>% inner_join(dfInfo %>% select(NAME, COUNTY, STATE), by = c("institution" = "NAME"))
-# add demographic information
-dfML2 <- dfRankCounty %>% inner_join(dfDemo %>% select(everything()), by = c("COUNTY" = "County")) %>% select(-c("institution", "country", "COUNTY", "STATE", "year", "CountyId"))
+# add demographic information, change the state abb to its name
+dfRankCounty$STATE <- abbr2state(dfRankCounty$STATE)
+dfML2 <- dfRankCounty %>% select("COUNTY", "STATE", "institution") %>% inner_join(dfDemo %>% select(everything()), by = c("COUNTY" = "County", "STATE" = "State")) %>% select(-c("COUNTY","STATE"))
 ```
 
 ### Classification Predicting
@@ -135,13 +135,13 @@ print(model)
 Rank is not the only factors for future student to choose universities. We would like to consider other factors such as demographic data of the county in which the universities locate.
 
 ```{r}
-dfML3 <- dfML2 %>% select(-c("world_rank", "national_rank", "State", "IncomeErr", "IncomePerCap", "IncomePerCapErr"))
-dfML3 %>% summary()
+internal <- dfML1 %>% select(-c("world_rank", "national_rank", "score"))
+head(internal)
 ```
 
 Principle Component Analysis
 ```{r}
-res <- dfML3 %>% prcomp(scale = TRUE) # scale to have unit variance before analysis
+res <- internal %>% prcomp(scale = TRUE) # scale to have unit variance before analysis
 str(res)
 ```
 
@@ -162,7 +162,7 @@ fviz_screeplot(res, main = "Scree Plot for the dfML3 Dataset")
 
 Cumulative PVE
 ```{r}
-pve[1:40, ] %>% ggplot(aes(x = 1: 40, y = cumulative.variance.percent)) +
+pve[1:8, ] %>% ggplot(aes(x = 1: 8, y = cumulative.variance.percent)) +
   geom_line() +
   geom_point() +
   xlab(" Principle Component") +
@@ -175,9 +175,16 @@ pve %>% filter(cumulative.variance.percent >= 80)
 ```
 
 ```{r}
-features <- 1:11
-refined <- score_mat[ , features]
+features <- 1:2
+refined <- score_mat[, features]
 refined
+```
+
+```{r}
+res %>% fviz_pca_var(axes = c(1,2),
+                 col.var = "contrib",
+                 gradient.cols = c("#00AFBB", "#E7B800"),
+                 repel = TRUE)
 ```
 
 ```{r}
@@ -192,17 +199,31 @@ str(hc_avg)
 ```
 
 ```{r}
-fviz_dend(hc_avg, k = 5, k_colors = "jco", as.ggplot = TRUE, show_labels = FALSE, main = 
-            "Euclidean-Average")
+fviz_dend(hc_avg, as.ggplot = TRUE, show_labels = FALSE, main = "Euclidean-Average")
+```
+```{r}
+fviz_nbclust(dfML3, hcut, hc_method ="average", hc_metric = "euclidean", method ="silhouette")
 ```
 
+
 ```{r}
-cluster_h <- cutree(hc_avg, k = 5)
+cluster_h <- cutree(hc_avg, k = 2)
 cluster_h
 ```
 
 ```{r}
+external <- dfML2 %>% select(-c("institution"))
+external
+```
+```{r}
+res2 <- external %>% prcomp(scale = TRUE) # scale to have unit variance before analysis
+str(res2)
+```
 
+```{r}
+loadings2 <- res2$rotation
+score_mat2 <- res2$x
+loadings[ , 1:5]
 ```
 
 
