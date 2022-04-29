@@ -1,6 +1,6 @@
 ---
 title: "Final Project"
-author: ""
+author: "Yuchen Li, Kede Lin, Yu Zhong, Kebei Yu"
 output: html_notebook
 ---
 ### Set up
@@ -17,6 +17,10 @@ library(mvtnorm)
 library(factoextra)
 library(ggplot2)
 library(usdata)
+library(ggpubr)
+library(factoextra)
+library(ggforce)
+library(cluster)
 ```
 
 ### Introduction
@@ -139,25 +143,26 @@ internal <- dfML1 %>% select(-c("world_rank", "national_rank", "score"))
 head(internal)
 ```
 
-Principle Component Analysis
+#### Perform Principle Component Analysis
 ```{r}
 res <- internal %>% prcomp(scale = TRUE) # scale to have unit variance before analysis
 str(res)
 ```
-
+Inspect the loading score
 ```{r}
 loadings <- res$rotation
 score_mat <- res$x
 loadings[ , 1:5]
 ```
-
+Get the cumulative variance for each dim
 ```{r}
 pve <- get_eig(res)
 pve
 ```
 
+Scree plot
 ```{r}
-fviz_screeplot(res, main = "Scree Plot for the dfML3 Dataset")
+fviz_screeplot(res, main = "Scree Plot for the internal Dataset")
 ```
 
 Cumulative PVE
@@ -167,64 +172,90 @@ pve[1:8, ] %>% ggplot(aes(x = 1: 8, y = cumulative.variance.percent)) +
   geom_point() +
   xlab(" Principle Component") +
   ylab("Cumulative Variance Explained") +
-  ggtitle("PCAs  vs Variance")
+  ggtitle("PCAs  vs Variance for internal dataset")
 ```
-
+We try to find the best PCAs which can reach at leat 80% of the cumulative variance
 ```{r}
 pve %>% filter(cumulative.variance.percent >= 80)
 ```
 
+Keep the first 2 PCs
 ```{r}
 features <- 1:2
 refined <- score_mat[, features]
 refined
 ```
-
+Biplot
 ```{r}
 res %>% fviz_pca_var(axes = c(1,2),
                  col.var = "contrib",
                  gradient.cols = c("#00AFBB", "#E7B800"),
                  repel = TRUE)
 ```
-
+Distance Matrix
 ```{r}
 eu_dist <- get_dist(refined, method = "euclidean")
-image(as.matrix(eu_dis), main = "Euclidean Distance")
+image(as.matrix(eu_dist), main = "Euclidean Distance")
 ```
 
-Average linkage Hierarchial Clustering
+#### Average linkage Hierarchical Clustering
 ```{r}
 hc_avg <- hclust(eu_dist, method = "average")
 str(hc_avg)
 ```
 
 ```{r}
-fviz_dend(hc_avg, as.ggplot = TRUE, show_labels = FALSE, main = "Euclidean-Average")
-```
-```{r}
-fviz_nbclust(dfML3, hcut, hc_method ="average", hc_metric = "euclidean", method ="silhouette")
+fviz_dend(hc_avg, k = 2, as.ggplot = TRUE, show_labels = FALSE, main = "Euclidean-Average")
 ```
 
+Find the best number of clusters for the hierarchical clustering model.
+```{r}
+fviz_nbclust(internal, hcut, hc_method ="average", hc_metric = "euclidean", method ="silhouette") +
+  labs(subtitle = "Silhouette method")
+```
 
 ```{r}
 cluster_h <- cutree(hc_avg, k = 2)
 cluster_h
 ```
+save the pairwise matrix to pdf form
+```{r}
+pdf(file = "pairwise.pdf")
+pairs(internal, col = cluster_h) 
+dev.off()
+```
+```{r}
+internal <- cbind(internal, cluster_h)
+refined <- cbind(as.data.frame(refined), cluster_h)
+```
 
 ```{r}
-external <- dfML2 %>% select(-c("institution"))
-external
+refined %>% ggplot(aes(x = PC1, y = PC2)) +
+  geom_point(col = cluster_h)
+```
+#### Perform kmeans clustering
+```{r}
+fviz_nbclust(internal, kmeans, method = "silhouette") +
+  labs(subtitle = "Silhouette method")
 ```
 ```{r}
-res2 <- external %>% prcomp(scale = TRUE) # scale to have unit variance before analysis
-str(res2)
+set.seed(123)
+res2 <- internal %>% kmeans(2)
+sil <- silhouette(x = res2$cluster, dis = eu_dist)
+sil[1:5, ]
+```
+```{r}
+fviz_silhouette(sil)
+```
+```{r}
+fviz_cluster(res2, data = internal,
+             palette = c("#2E9FDF", "#00AFBB", "#E7B800"), 
+             geom = "point",
+             ellipse.type = "convex", 
+             ggtheme = theme_bw()
+             )
 ```
 
-```{r}
-loadings2 <- res2$rotation
-score_mat2 <- res2$x
-loadings[ , 1:5]
-```
 
 
 
