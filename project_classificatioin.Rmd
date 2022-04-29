@@ -1,0 +1,185 @@
+---
+title: "Final Project"
+author: "Kebei Yu, Yu Zhong, Yuchen Li, Kedi Lin"
+output: html_notebook
+---
+### Set up
+```{r}
+# load necessary packages
+library(tidyverse)
+library(mosaic)
+library(dcData)
+library(readr)
+library(maps)
+library(dplyr)
+library(tidyverse)
+library(mdsr)
+library(mvtnorm)
+library(factoextra)
+```
+
+### Introduction
+__There are hundreds of national universities that rank high globally. In this project, we intend to explore data related to the ranking of American universities. Through the data analysis of the top universities in the United States, our objectives are to to identify what conditions the university is most likely to be ranked high and build a model for future predictions. Also, we would like to perform clustering analysis to find the similar universities for references.__
+
+### Data sources and data intake
+```{r}
+# This contains rank and internal factors that affect rank.
+dfRank <- read.csv("cwurData.csv") %>% filter(year == 2015, country == "USA")
+#dfCountry <- read.csv("school_and_country_table.csv")
+# This is about geographic and other information for each university
+dfInfo <- read.csv("world-universities.csv")
+# This is demographic data by county
+dfDemo <- read.csv("acs2017_county_data.csv")
+```
+__These data were published by The Center for World University Rankings (CWUR) in 2019. And CWUR performed quantitative research to assess the quality of education, alumni employment, quality of faculty, and research performance without relying on surveys and university data submissions. Reader can download the data from the following link:__
+<https://www.kaggle.com/mylesoneill/world-university-rankings/download>
+
+```{r}
+MainStates <- map_data("state")
+```
+This data is from __maps__ library which provide basic geographical data of main states in the US.
+
+### Data cleaning and wrangling
+```{r}
+#dfCountry <-dfCountry %>% mutate(country = gsub(pattern = "United States of America", replacement = "USA", country))
+
+dfDemo <-dfDemo %>% mutate(County = gsub(pattern = " County", replacement = "", County))
+```
+
+```{r}
+dfInfo$NAME <- tolower(dfInfo$NAME)
+dfInfo$COUNTY <- tolower(dfInfo$COUNTY)
+dfRank$institution <- tolower(dfRank$institution)
+#dfCountry$school_name <- tolower(dfCountry$school_name)
+dfRank$institution <- tolower(dfRank$institution)
+dfDemo$County <- tolower(dfDemo$County)
+names(state.abb) <- state.name  
+dfDemo$State <- state.abb[dfDemo$State]
+```
+Also, we notice that the texts format is different in upper and lower cases. And we unify all the text to lower cases.
+
+```{r}
+# dataset for predicting
+dfML1 <- dfRank %>% select(-c("institution", "country", "year"))
+# binning for top200 and others
+rankData <- dfML1$world_rank
+for(x in 1:length(rankData)){
+  if (rankData[x] <=200){
+    dfML1$world_rank[x] <- "Top200"
+  } else{
+    dfML1$world_rank[x] <- "NotTop200"
+  }
+}
+dfML1$world_rank <-as.factor(dfML1$world_rank)
+
+
+```
+We bin the world rank into different groups for our future exploration.
+
+```{r}
+# dataset for clustering
+# add county information
+dfRankCounty <- dfRank %>% inner_join(dfInfo %>% select(NAME, COUNTY, STATE), by = c("institution" = "NAME"))
+# add demographic information
+dfML2 <- dfRankCounty %>% inner_join(dfDemo %>% select(everything()), by = c("COUNTY" = "County", "STATE" = "State")) %>% select(-c("institution", "country", "COUNTY", "STATE", "year", "CountyId"))
+rankData <- dfML2$world_rank
+for(x in 1:length(rankData)){
+  if (rankData[x] <=200){
+    dfML2$world_rank[x] <- "Top200"
+  } else{
+    dfML2$world_rank[x] <- "NotTop200"
+  }
+}
+dfML2$world_rank <-as.factor(dfML2$world_rank)
+```
+
+```{r}
+glm_probs <- predict(glm_fits, type = "response")
+glm_probs %>% head()
+```
+```{r}
+contrasts(dfML1$world_rank)
+```
+```{r}
+glm_pred <- rep("NotTop200", 227)
+glm_pred[glm_probs > .5] = "Top200"
+glm_pred[1:100]
+```
+```{r}
+table(glm_pred, dfML1$world_rank)
+```
+```{r}
+mean(glm_pred == dfML1$world_rank, na.rm = TRUE)
+```
+
+```{r}
+# define training control
+library(caret)
+train_control <- trainControl(method = "cv", number = 10)
+
+# train the model on training set
+model <- train(world_rank ~ quality_of_education + alumni_employment + quality_of_faculty + patents + influence + broad_impact,
+               data = dfML1,
+               trControl = train_control,
+               method = "glm",
+               family=binomial())
+
+# print cv scores
+print(model)
+```
+
+
+### Clustering analysis
+Rank is not the only factors for future student to choose universities. We would like to consider other factors such as demographic data of the county in which the universities locate.
+
+
+
+### Classification Predicting2
+```{r}
+glm_fits2 <- glm(world_rank ~ TotalPop + Income + IncomePerCap + Poverty + Construction + Unemployment, data = dfML2, family = binomial)
+summary(glm_fits)
+```
+```{r}
+glm_probs2 <- predict(glm_fits2, type = "response")
+glm_probs2 %>% head()
+```
+```{r}
+contrasts(dfML2$world_rank)
+```
+```{r}
+glm_pred2 <- rep("NotTop200", 122)
+glm_pred2[glm_probs2 > .5] = "Top200"
+glm_pred2
+```
+```{r}
+table(glm_pred2, dfML2$world_rank)
+```
+```{r}
+mean(glm_pred2 == dfML2$world_rank, na.rm = TRUE)
+```
+
+```{r}
+# define training control
+library(caret)
+train_control <- trainControl(method = "cv", number = 10)
+
+# train the model on training set
+model <- train(world_rank ~ TotalPop + Income + IncomePerCap + Poverty + Construction + Unemployment,
+               data = dfML2,
+               trControl = train_control,
+               method = "glm",
+               family=binomial())
+
+# print cv scores
+print(model)
+```
+
+
+
+
+
+
+
+
+
+
