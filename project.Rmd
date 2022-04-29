@@ -8,7 +8,6 @@ output: html_notebook
 # load necessary packages
 library(tidyverse)
 library(mosaic)
-library(dcData)
 library(readr)
 library(maps)
 library(dplyr)
@@ -16,6 +15,7 @@ library(tidyverse)
 library(mdsr)
 library(mvtnorm)
 library(factoextra)
+library(ggplot2)
 ```
 
 ### Introduction
@@ -87,7 +87,7 @@ We bin the world rank into different groups for our future exploration.
 # add county information
 dfRankCounty <- dfRank %>% inner_join(dfInfo %>% select(NAME, COUNTY, STATE), by = c("institution" = "NAME"))
 # add demographic information
-dfML2 <- dfRankCounty %>% inner_join(dfDemo %>% select(everything()), by = c("COUNTY" = "County", "STATE" = "State")) %>% select(-c("institution", "country", "COUNTY", "STATE", "year", "CountyId"))
+dfML2 <- dfRankCounty %>% inner_join(dfDemo %>% select(everything()), by = c("COUNTY" = "County")) %>% select(-c("institution", "country", "COUNTY", "STATE", "year", "CountyId"))
 ```
 
 ### Classification Predicting
@@ -134,15 +134,76 @@ print(model)
 ### Clustering analysis
 Rank is not the only factors for future student to choose universities. We would like to consider other factors such as demographic data of the county in which the universities locate.
 
+```{r}
+dfML3 <- dfML2 %>% select(-c("world_rank", "national_rank", "State", "IncomeErr", "IncomePerCap", "IncomePerCapErr"))
+dfML3 %>% summary()
+```
 
+Principle Component Analysis
+```{r}
+res <- dfML3 %>% prcomp(scale = TRUE) # scale to have unit variance before analysis
+str(res)
+```
 
+```{r}
+loadings <- res$rotation
+score_mat <- res$x
+loadings[ , 1:5]
+```
 
+```{r}
+pve <- get_eig(res)
+pve
+```
 
+```{r}
+fviz_screeplot(res, main = "Scree Plot for the dfML3 Dataset")
+```
 
+Cumulative PVE
+```{r}
+pve[1:40, ] %>% ggplot(aes(x = 1: 40, y = cumulative.variance.percent)) +
+  geom_line() +
+  geom_point() +
+  xlab(" Principle Component") +
+  ylab("Cumulative Variance Explained") +
+  ggtitle("PCAs  vs Variance")
+```
 
+```{r}
+pve %>% filter(cumulative.variance.percent >= 80)
+```
 
+```{r}
+features <- 1:11
+refined <- score_mat[ , features]
+refined
+```
 
+```{r}
+eu_dist <- get_dist(refined, method = "euclidean")
+image(as.matrix(eu_dis), main = "Euclidean Distance")
+```
 
+Average linkage Hierarchial Clustering
+```{r}
+hc_avg <- hclust(eu_dist, method = "average")
+str(hc_avg)
+```
+
+```{r}
+fviz_dend(hc_avg, k = 5, k_colors = "jco", as.ggplot = TRUE, show_labels = FALSE, main = 
+            "Euclidean-Average")
+```
+
+```{r}
+cluster_h <- cutree(hc_avg, k = 5)
+cluster_h
+```
+
+```{r}
+
+```
 
 
 
